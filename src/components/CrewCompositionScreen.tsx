@@ -9,6 +9,7 @@ import {
   type CompositionType,
   type FlightTimeInputMode,
   type PortalTable,
+  type AreaExpansionRow,
 } from '../lib/crewCompositionCalculator'
 
 const COMPOSITION_OPTIONS: { value: CompositionType; label: string }[] = [
@@ -164,14 +165,14 @@ export function CrewCompositionScreen() {
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-xs text-neutral-500 dark:text-neutral-400">Times in UTC. Enter as hh:mm (24h).</p>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">Times in UTC. Enter as hh:mm or hhmm (24h).</p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="off-block" className="block text-sm font-medium text-neutral-600 dark:text-neutral-300 mb-1">Off block (UTC)</label>
                   <input
                     id="off-block"
                     type="text"
-                    placeholder="hh:mm"
+                    placeholder="hh:mm or hhmm"
                     value={offBlockTime}
                     onChange={(e) => setOffBlockTime(e.target.value)}
                     className="w-full h-12 px-4 rounded-xl bg-neutral-100 dark:bg-neutral-800 border-0 text-base placeholder:text-neutral-400"
@@ -182,7 +183,7 @@ export function CrewCompositionScreen() {
                   <input
                     id="on-block"
                     type="text"
-                    placeholder="hh:mm"
+                    placeholder="hh:mm or hhmm"
                     value={onBlockTime}
                     onChange={(e) => setOnBlockTime(e.target.value)}
                     className="w-full h-12 px-4 rounded-xl bg-neutral-100 dark:bg-neutral-800 border-0 text-base placeholder:text-neutral-400"
@@ -277,7 +278,7 @@ export function CrewCompositionScreen() {
         </div>
       </section>
 
-      {/* Company portal table (A5:F9 style) */}
+      {/* Company portal table */}
       <section className="bg-white dark:bg-neutral-900 rounded-2xl shadow-sm dark:shadow-none border border-neutral-200/60 dark:border-neutral-800 overflow-hidden mb-6">
         <div className="px-4 py-3 border-b border-neutral-200/60 dark:border-neutral-800">
           <h2 className="text-sm font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
@@ -286,44 +287,85 @@ export function CrewCompositionScreen() {
         </div>
         <div className="p-4 overflow-x-auto">
           {portal ? (
-            <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-neutral-200 dark:border-neutral-700">
-                  <th className="py-2 pr-3 font-medium text-neutral-500 dark:text-neutral-400"></th>
-                  <th colSpan={2} className="py-2 px-2 font-medium text-neutral-500 dark:text-neutral-400">DUTY</th>
-                  <th colSpan={2} className="py-2 px-2 font-medium text-neutral-500 dark:text-neutral-400">OTHER DUTY</th>
-                  <th className="py-2 pl-2 font-medium text-neutral-500 dark:text-neutral-400">IMC</th>
-                </tr>
-                <tr className="border-b border-neutral-200 dark:border-neutral-700 text-neutral-500 dark:text-neutral-400 text-xs">
-                  <th className="py-1.5 pr-3"></th>
-                  <th className="py-1.5 px-2">OPR</th>
-                  <th className="py-1.5 px-2">NIGHT</th>
-                  <th className="py-1.5 px-2">OPR</th>
-                  <th className="py-1.5 px-2">NIGHT</th>
-                  <th className="py-1.5 pl-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {portal.rows.map((row) => (
-                  <tr key={row.role} className="border-b border-neutral-100 dark:border-neutral-800">
-                    <td className="py-2.5 pr-3 font-medium text-neutral-700 dark:text-neutral-200">{row.role}</td>
-                    <td className={`py-2.5 px-2 tabular-nums ${row.dutyOpr ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-500 bg-neutral-100 dark:bg-neutral-800'}`}>
-                      {row.dutyOpr ?? '—'}
-                    </td>
-                    <td className={`py-2.5 px-2 tabular-nums ${row.dutyNight ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-500 bg-neutral-100 dark:bg-neutral-800'}`}>
-                      {row.dutyNight ?? '—'}
-                    </td>
-                    <td className={`py-2.5 px-2 tabular-nums ${row.otherOpr ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-500 bg-neutral-100 dark:bg-neutral-800'}`}>
-                      {row.otherOpr ?? '—'}
-                    </td>
-                    <td className={`py-2.5 px-2 tabular-nums ${row.otherNight ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-500 bg-neutral-100 dark:bg-neutral-800'}`}>
-                      {row.otherNight ?? '—'}
-                    </td>
-                    <td className="py-2.5 pl-2 tabular-nums text-neutral-900 dark:text-white">{row.imc ?? '—'}</td>
+            portal.format === 'area-expansion' ? (
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-neutral-200 dark:border-neutral-700">
+                    <th className="py-2 pr-3 font-medium text-neutral-500 dark:text-neutral-400"></th>
+                    <th colSpan={2} className="py-2 px-2 font-medium text-neutral-500 dark:text-neutral-400">DUTY</th>
+                    <th colSpan={2} className="py-2 px-2 font-medium text-neutral-500 dark:text-neutral-400">OTHER DUTY</th>
+                    <th className="py-2 pl-2 font-medium text-neutral-500 dark:text-neutral-400">IMC</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                  <tr className="border-b border-neutral-200 dark:border-neutral-700 text-neutral-500 dark:text-neutral-400 text-xs">
+                    <th className="py-1.5 pr-3"></th>
+                    <th className="py-1.5 px-2">OPR</th>
+                    <th className="py-1.5 px-2">NIGHT</th>
+                    <th className="py-1.5 px-2">OPR</th>
+                    <th className="py-1.5 px-2">NIGHT</th>
+                    <th className="py-1.5 pl-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {portal.rows.map((row: AreaExpansionRow) => (
+                    <tr key={row.code} className="border-b border-neutral-100 dark:border-neutral-800">
+                      <td className="py-2.5 pr-3 font-medium text-neutral-700 dark:text-neutral-200">{row.code}</td>
+                      <td className={`py-2.5 px-2 tabular-nums ${row.dutyOpr ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-500 bg-neutral-100 dark:bg-neutral-800'}`}>
+                        {row.dutyOpr ?? '—'}
+                      </td>
+                      <td className={`py-2.5 px-2 tabular-nums ${row.dutyNight ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-500 bg-neutral-100 dark:bg-neutral-800'}`}>
+                        {row.dutyNight ?? '—'}
+                      </td>
+                      <td className={`py-2.5 px-2 tabular-nums ${row.otherOpr ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-500 bg-neutral-100 dark:bg-neutral-800'}`}>
+                        {row.otherOpr ?? '—'}
+                      </td>
+                      <td className={`py-2.5 px-2 tabular-nums ${row.otherNight ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-500 bg-neutral-100 dark:bg-neutral-800'}`}>
+                        {row.otherNight ?? '—'}
+                      </td>
+                      <td className="py-2.5 pl-2 tabular-nums text-neutral-900 dark:text-white">{row.imc ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-neutral-200 dark:border-neutral-700">
+                    <th className="py-2 pr-3 font-medium text-neutral-500 dark:text-neutral-400"></th>
+                    <th colSpan={2} className="py-2 px-2 font-medium text-neutral-500 dark:text-neutral-400">DUTY</th>
+                    <th colSpan={2} className="py-2 px-2 font-medium text-neutral-500 dark:text-neutral-400">OTHER DUTY</th>
+                    <th className="py-2 pl-2 font-medium text-neutral-500 dark:text-neutral-400">IMC</th>
+                  </tr>
+                  <tr className="border-b border-neutral-200 dark:border-neutral-700 text-neutral-500 dark:text-neutral-400 text-xs">
+                    <th className="py-1.5 pr-3"></th>
+                    <th className="py-1.5 px-2">OPR</th>
+                    <th className="py-1.5 px-2">NIGHT</th>
+                    <th className="py-1.5 px-2">OPR</th>
+                    <th className="py-1.5 px-2">NIGHT</th>
+                    <th className="py-1.5 pl-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {portal.rows.map((row) => (
+                    <tr key={row.role} className="border-b border-neutral-100 dark:border-neutral-800">
+                      <td className="py-2.5 pr-3 font-medium text-neutral-700 dark:text-neutral-200">{row.role}</td>
+                      <td className={`py-2.5 px-2 tabular-nums ${row.dutyOpr ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-500 bg-neutral-100 dark:bg-neutral-800'}`}>
+                        {row.dutyOpr ?? '—'}
+                      </td>
+                      <td className={`py-2.5 px-2 tabular-nums ${row.dutyNight ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-500 bg-neutral-100 dark:bg-neutral-800'}`}>
+                        {row.dutyNight ?? '—'}
+                      </td>
+                      <td className={`py-2.5 px-2 tabular-nums ${row.otherOpr ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-500 bg-neutral-100 dark:bg-neutral-800'}`}>
+                        {row.otherOpr ?? '—'}
+                      </td>
+                      <td className={`py-2.5 px-2 tabular-nums ${row.otherNight ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 dark:text-neutral-500 bg-neutral-100 dark:bg-neutral-800'}`}>
+                        {row.otherNight ?? '—'}
+                      </td>
+                      <td className="py-2.5 pl-2 tabular-nums text-neutral-900 dark:text-white">{row.imc ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
           ) : (
             <p className="text-neutral-500 dark:text-neutral-400 text-sm py-4">
               Enter block time and/or NIGHT & IMC above to see portal values.

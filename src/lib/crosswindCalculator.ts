@@ -11,8 +11,10 @@ export function crosswindHeadwind(
 ): { crosswindKt: number; headwindKt: number } {
   const angleDeg = (windDirectionDeg - runwayHeadingDeg + 540) % 360 - 180
   const angleRad = (angleDeg * Math.PI) / 180
-  const crosswindKt = windSpeedKt * Math.sin(angleRad)
-  const headwindKt = -windSpeedKt * Math.cos(angleRad)
+  // Positive = from left, negative = from right (pilot convention: crosswind component from left increases left drift).
+  const crosswindKt = -windSpeedKt * Math.sin(angleRad)
+  // Positive = headwind, negative = tailwind (wind opposing / aiding runway direction).
+  const headwindKt = windSpeedKt * Math.cos(angleRad)
   return { crosswindKt, headwindKt }
 }
 

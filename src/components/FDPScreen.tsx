@@ -67,6 +67,34 @@ function clampMinute(n: number): number {
   return Math.max(0, Math.min(59, Math.floor(n)))
 }
 
+/** Parse timezone value (e.g. "UTC+9", "UTC-5", "UTC+5:30") to offset in minutes (positive = ahead of UTC). */
+function timezoneOffsetMinutes(tzValue: string): number {
+  const m = tzValue.match(/^UTC([+-])(\d+)(?::(\d+))?$/)
+  if (!m) return 0
+  const sign = m[1] === '+' ? 1 : -1
+  const hours = parseInt(m[2], 10)
+  const minutes = parseInt(m[3] ?? '0', 10)
+  return sign * (hours * 60 + minutes)
+}
+
+/** Convert local wheels-up time (in report timezone) to UTC time string and day indicator. */
+function localWheelsUpToUtc(
+  time: string,
+  nextDay: boolean,
+  tzOffsetMinutes: number
+): { utcTime: string; utcNextDay: boolean; utcPrevDay: boolean } {
+  const localMin = (nextDay ? 24 * 60 : 0) + parseTimeToMinutes(time)
+  let utcMin = localMin - tzOffsetMinutes
+  const utcPrevDay = utcMin < 0
+  const utcNextDay = utcMin >= 24 * 60
+  if (utcPrevDay) utcMin += 24 * 60
+  if (utcNextDay) utcMin -= 24 * 60
+  const h = Math.floor(utcMin / 60) % 24
+  const min = Math.round(utcMin % 60)
+  const utcTime = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`
+  return { utcTime, utcNextDay, utcPrevDay }
+}
+
 export function FDPScreen() {
   const now = new Date()
   const [reportHourInput, setReportHourInput] = useState(pad2(now.getHours()))
@@ -383,7 +411,28 @@ export function FDPScreen() {
                     {wheelsUpResult.nextDay && (
                       <span className="text-base font-normal text-neutral-500 dark:text-neutral-400 ml-2">(next day)</span>
                     )}
+                    <span className="text-base font-normal text-neutral-500 dark:text-neutral-400 ml-2">
+                      {TIMEZONE_OPTIONS.find((z) => z.value === reportTimezone)?.label ?? reportTimezone}
+                    </span>
                   </p>
+                  {(() => {
+                    const tzOffset = timezoneOffsetMinutes(reportTimezone)
+                    const { utcTime, utcNextDay, utcPrevDay } = localWheelsUpToUtc(
+                      wheelsUpResult.time,
+                      wheelsUpResult.nextDay,
+                      tzOffset
+                    )
+                    const utcDayNote = utcNextDay ? ' (next day)' : utcPrevDay ? ' (previous day)' : ''
+                    return (
+                      <p className="text-2xl font-semibold text-ios-blue dark:text-ios-blue tabular-nums mt-1">
+                        {utcTime}
+                        <span className="text-base font-normal text-ios-blue dark:text-ios-blue ml-2">UTC</span>
+                        {utcDayNote && (
+                          <span className="text-base font-normal text-neutral-500 dark:text-neutral-400 ml-2">{utcDayNote}</span>
+                        )}
+                      </p>
+                    )
+                  })()}
                   <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-1">
                     Includes destination taxi and 50&nbsp;min sign-off after on chocks
                   </p>
@@ -425,9 +474,6 @@ export function FDPScreen() {
                   </div>
                 </div>
               )}
-              <p className="text-xs text-neutral-400 dark:text-neutral-500 pt-2 border-t border-neutral-200/60 dark:border-neutral-800">
-                AJX Ops Manual 8-5-1 · {result.source}
-              </p>
             </div>
           ) : (
             <p className="text-neutral-500 dark:text-neutral-400">Enter a valid report time.</p>

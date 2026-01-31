@@ -11,7 +11,6 @@ export type RestFacilityClass = 1 | 2 | 3;
 
 /**
  * Labels and descriptions for in-flight rest facility classes (3/4 crew).
- * Used for FDP limits per AJX Ops Manual 8-5-1 ②(1)2)C.
  */
 export const REST_FACILITY_CLASS_INFO: Record<
   RestFacilityClass,

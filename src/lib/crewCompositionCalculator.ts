@@ -21,12 +21,30 @@ export function formatMinutesAsHHMM(totalMinutes: number): string {
   return `${h}:${String(m).padStart(2, '0')}`
 }
 
-/** Parse "h:mm" or "hh:mm" to total minutes */
+/** Parse "h:mm", "hh:mm" or "hhmm" to total minutes */
 export function parseHHMM(value: string): number {
-  const parts = value.trim().split(':').map(Number)
-  if (parts.length < 2 || parts.some(Number.isNaN)) return 0
-  const [h, m] = parts
-  return Math.max(0, h * 60 + Math.round(m))
+  const s = value.trim()
+  if (!s) return 0
+
+  if (s.includes(':')) {
+    const parts = s.split(':').map(Number)
+    if (parts.length < 2 || parts.some(Number.isNaN)) return 0
+    const [h, m] = parts
+    return Math.max(0, h * 60 + Math.round(m))
+  }
+
+  const digits = s.replace(/\D/g, '')
+  if (digits.length === 0) return 0
+  if (digits.length === 1) return Math.max(0, parseInt(digits, 10) * 60)
+  if (digits.length === 2) return Math.max(0, parseInt(digits, 10) * 60)
+  if (digits.length === 3) {
+    const h = parseInt(digits.slice(0, 1), 10)
+    const m = parseInt(digits.slice(1, 3), 10)
+    return Math.max(0, h * 60 + Math.min(59, m))
+  }
+  const h = parseInt(digits.slice(0, 2), 10)
+  const m = parseInt(digits.slice(2, 4), 10)
+  return Math.max(0, h * 60 + Math.min(59, m))
 }
 
 export interface CrewCompositionInput {
@@ -52,23 +70,40 @@ export interface PortalRow {
   imc: PortalCell
 }
 
-export interface PortalTable {
+/** Area expansion row: AQTR/AQTE/CAPM (captain) or OFTR/OFTE/CAPM (copilot). Same column structure as normal. */
+export interface AreaExpansionRow {
+  code: string
+  dutyOpr: PortalCell
+  dutyNight: PortalCell
+  otherOpr: PortalCell
+  otherNight: PortalCell
+  imc: PortalCell
+}
+
+export interface PortalTableNormal {
+  format: 'normal'
   rows: PortalRow[]
-  /** Total flight time displayed as hh:mm */
   totalBlockFormatted: string
 }
+
+export interface PortalTableAreaExpansion {
+  format: 'area-expansion'
+  rows: AreaExpansionRow[]
+  totalBlockFormatted: string
+  expansionType: 'captain' | 'copilot'
+}
+
+export type PortalTable = PortalTableNormal | PortalTableAreaExpansion
 
 function toHHMM(minutes: number): string {
   return formatMinutesAsHHMM(minutes)
 }
 
 /**
- * Compute portal table for 3-crew (CAP, CAPM, COP).
- * Which role has the "1/3 + 1/3" (OTHER DUTY) split depends on composition type:
- * - Normal: CAPM (monitoring pilot on rest) has the split.
- * - Captain area expansion: CAP (captain on rest) has the split.
- * - Co-pilot area expansion: COP (co-pilot on rest) has the split.
- * The other two roles always get 2/3 in DUTY only. IMC: 2/3 total each for all.
+ * Compute portal table for 3-crew.
+ * - Normal: CAP/CAPM/COP with DUTY OPR, NIGHT, OTHER DUTY OPR, NIGHT, IMC.
+ * - Captain area expansion: AQTR/AQTE/CAPM with DUTY, OTHER DUTY (per spec: 4/6, 2/6+2/6, 2/6+2/6).
+ * - Co-pilot area expansion: OFTR/OFTE/CAPM with DUTY, OTHER DUTY (per spec: 4/6, 4/6, 2/6+2/6).
  */
 export function crewCompositionToPortalTable(input: CrewCompositionInput): PortalTable {
   const { blockMinutes, nightMinutes, imcMinutes, compositionType } = input
@@ -79,6 +114,45 @@ export function crewCompositionToPortalTable(input: CrewCompositionInput): Porta
   const oneThirdNight = Math.round(nightMinutes / 3)
   const imcPerPerson = Math.round((imcMinutes * 2) / 3)
 
+  if (compositionType === 'captain-expansion') {
+    // Captain area expansion: AQTR 4/6 duty, AQTE 2/6+2/6, CAPM 2/6+2/6. NIGHT & IMC use same fractions.
+    const fourSixthsBlock = Math.round((blockMinutes * 4) / 6)
+    const twoSixthsBlock = Math.round((blockMinutes * 2) / 6)
+    const fourSixthsNight = Math.round((nightMinutes * 4) / 6)
+    const twoSixthsNight = Math.round((nightMinutes * 2) / 6)
+    const imcPerPerson = Math.round((imcMinutes * 2) / 3)
+    return {
+      format: 'area-expansion',
+      expansionType: 'captain',
+      rows: [
+        { code: 'AQTR', dutyOpr: toHHMM(fourSixthsBlock), dutyNight: toHHMM(fourSixthsNight), otherOpr: null, otherNight: null, imc: toHHMM(imcPerPerson) },
+        { code: 'AQTE', dutyOpr: toHHMM(twoSixthsBlock), dutyNight: toHHMM(twoSixthsNight), otherOpr: toHHMM(twoSixthsBlock), otherNight: toHHMM(twoSixthsNight), imc: toHHMM(imcPerPerson) },
+        { code: 'CAPM', dutyOpr: toHHMM(twoSixthsBlock), dutyNight: toHHMM(twoSixthsNight), otherOpr: toHHMM(twoSixthsBlock), otherNight: toHHMM(twoSixthsNight), imc: toHHMM(imcPerPerson) },
+      ],
+      totalBlockFormatted: toHHMM(blockMinutes),
+    }
+  }
+
+  if (compositionType === 'copilot-expansion') {
+    // Co-pilot area expansion: OFTR 4/6 duty, OFTE 4/6 duty, CAPM 2/6+2/6. NIGHT & IMC use same fractions.
+    const fourSixthsBlock = Math.round((blockMinutes * 4) / 6)
+    const twoSixthsBlock = Math.round((blockMinutes * 2) / 6)
+    const fourSixthsNight = Math.round((nightMinutes * 4) / 6)
+    const twoSixthsNight = Math.round((nightMinutes * 2) / 6)
+    const imcPerPerson = Math.round((imcMinutes * 2) / 3)
+    return {
+      format: 'area-expansion',
+      expansionType: 'copilot',
+      rows: [
+        { code: 'OFTR', dutyOpr: toHHMM(fourSixthsBlock), dutyNight: toHHMM(fourSixthsNight), otherOpr: null, otherNight: null, imc: toHHMM(imcPerPerson) },
+        { code: 'OFTE', dutyOpr: toHHMM(fourSixthsBlock), dutyNight: toHHMM(fourSixthsNight), otherOpr: null, otherNight: null, imc: toHHMM(imcPerPerson) },
+        { code: 'CAPM', dutyOpr: toHHMM(twoSixthsBlock), dutyNight: toHHMM(twoSixthsNight), otherOpr: toHHMM(twoSixthsBlock), otherNight: toHHMM(twoSixthsNight), imc: toHHMM(imcPerPerson) },
+      ],
+      totalBlockFormatted: toHHMM(blockMinutes),
+    }
+  }
+
+  // Normal composition: CAP, CAPM, COP with full column set
   const dutyOnly = {
     dutyOpr: toHHMM(twoThirdsBlock),
     dutyNight: toHHMM(twoThirdsNight),
@@ -94,29 +168,14 @@ export function crewCompositionToPortalTable(input: CrewCompositionInput): Porta
     imc: toHHMM(imcPerPerson),
   }
 
-  const whoHasSplit =
-    compositionType === 'captain-expansion'
-      ? 'CAP'
-      : compositionType === 'copilot-expansion'
-        ? 'COP'
-        : 'CAPM'
-
   const rows: PortalRow[] = [
-    {
-      role: 'CAP',
-      ...(whoHasSplit === 'CAP' ? dutyAndOther : dutyOnly),
-    },
-    {
-      role: 'CAPM',
-      ...(whoHasSplit === 'CAPM' ? dutyAndOther : dutyOnly),
-    },
-    {
-      role: 'COP',
-      ...(whoHasSplit === 'COP' ? dutyAndOther : dutyOnly),
-    },
+    { role: 'CAP', ...dutyOnly },
+    { role: 'CAPM', ...dutyAndOther },
+    { role: 'COP', ...dutyOnly },
   ]
 
   return {
+    format: 'normal',
     rows,
     totalBlockFormatted: toHHMM(blockMinutes),
   }
