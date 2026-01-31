@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* iOS-style base and safe area */
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-neutral-100 dark:bg-black text-neutral-900 dark:text-neutral-100 font-sans antialiased;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    min-height: 100dvh;
+  }
+}
+
+/* Prevent zoom on input focus on iOS */
+@layer utilities {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
